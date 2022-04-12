@@ -4,15 +4,14 @@
 #include <WiFi.h>  
 #include <PubSubClient.h>
 #include <WiFiClientSecure.h>
-#include <Adafruit_Fingerprint.h>
 #include <HardwareSerial.h>
-
-
-#define mySerial Serial2
 
 uint8_t fingerTemplate[512]; // the real template
 
-Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+
+
+#include "configSensor.h"
+#include "authenticate.h"
 #include "registerDriverPrint.h"
 #include "getDriverFingerPrint.h"
 
@@ -43,7 +42,13 @@ const char* driverpub_topic="driv/register/sendFP";
 
 
 
+// Set GPIOs for LED 
+const int led = 32;
+const int doors = 25;
+const int authButton = 35;
 
+
+boolean auth = false;
 
 
 
@@ -123,54 +128,73 @@ void reconnect() {
   }
 }
 
-//================================================ setup
-//================================================
+
+
+
+
+// Checks if motion was detected, sets LED HIGH and starts a timer
+void IRAM_ATTR authenticateTrig() {
+  Serial.println("Authenticate");
+  auth = true;
+}
+
 void setup() {
-  Serial.begin(9600);
-  while (!Serial) delay(1);
-  setup_wifi();
+   setup_wifi();
   pinMode(BUILTIN_LED, OUTPUT);     // Initialize the BUILTIN_LED pin as an output
 
 
 
-   espClient.setCACert(root_ca);      // enable this line and the the "certificate" code for secure connection
+  espClient.setCACert(root_ca);      // enable this line and the the "certificate" code for secure connection
   
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
   
-  // set the data rate for the sensor serial port
+  // Serial port for debugging purposes
+  Serial.begin(115200);
   finger.begin(57600);
-    if (finger.verifyPassword()) {
-    Serial.println("Found fingerprint sensor!");
-  } else {
-    Serial.println("Did not find fingerprint sensor :(");
-    while (1) { delay(1); }
-  }
+  
+  // PIR Motion Sensor mode INPUT_PULLUP
+  pinMode(authButton, INPUT);
+  // Set motionSensor pin as interrupt, assign interrupt function and set RISING mode
+  attachInterrupt(digitalPinToInterrupt(authButton), authenticateTrig, FALLING);
 
-  Serial.println(F("Reading sensor parameters"));
-  finger.getParameters();
-  Serial.print(F("Status: 0x")); Serial.println(finger.status_reg, HEX);
-  Serial.print(F("Sys ID: 0x")); Serial.println(finger.system_id, HEX);
-  Serial.print(F("Capacity: ")); Serial.println(finger.capacity);
-  Serial.print(F("Security level: ")); Serial.println(finger.security_level);
-  Serial.print(F("Device address: ")); Serial.println(finger.device_addr, HEX);
-  Serial.print(F("Packet len: ")); Serial.println(finger.packet_len);
-  Serial.print(F("Baud rate: ")); Serial.println(finger.baud_rate);
+  // Set LED to LOW
+  pinMode(led, OUTPUT);
+  digitalWrite(led, LOW);
 
-
+  pinMode(doors, OUTPUT);
+  digitalWrite(doors, LOW);
 }
 
-
-//================================================ loop
-//================================================
 void loop() {
-           if (!client.connected()) reconnect();
-            client.loop();
-            delay(2000);
+  if (!client.connected()) reconnect();
+  client.loop();
+  digitalWrite(led, HIGH);
+  Serial.print("on");
+  delay(2000);
+  Serial.print("off");
+  digitalWrite(led, LOW);
+   delay(2000);
+  if(auth) {
+    //call the authentication function
+    Serial.println("call the authentication function");
+   
+    uint8_t passId=  authenticate();
+    if(passId==false){
+      //dont open doors, authentication failed, failed to register passenger
+      Serial.print("dont open doors, authentication failed, failed to register passenger");
+    }else if(passId==250){
+      //dont open doors, allert police, driver not authenticated
+      Serial.print("dont open doors, allert police, driver not authenticated");
+    }else{
+      //get passenger id open doors and use the id to fetch and send the activity details to the server
+      Serial.print("get passenger id open doors and use the id to fetch and send the activity details to the server");
+      digitalWrite(doors, HIGH);
+    }
+    auth = false;
+  }
 }
 
-
-//call back to andle messages from the broker
 
 void callback(char* topic, byte* payload, unsigned int length) {
 
@@ -207,7 +231,8 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
              if (!client.connected()) reconnect();
              client.loop();
-             client.publish(driverpub_topic,JSONmessageBuffer);
+             bool st = client.publish(driverpub_topic,JSONmessageBuffer);
+             Serial.print(st);
      
            
                 
@@ -218,7 +243,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         Serial.println("wrong toipc value");
        }
     }else{
-       Serial.println("wrong toipc");
-     }
+       Serial.println("another topic");
+    }
 
 }

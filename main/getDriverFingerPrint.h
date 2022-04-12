@@ -1,32 +1,13 @@
 
-#include <Adafruit_Fingerprint.h>
+  
+void printHex(int num, int precision) {
+  char tmp[16];
+  char format[128];
 
+  sprintf(format, "%%.%dX", precision);
 
-#define mySerial Serial2
-
-
-
-Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
-
-int getFingerprintIDez();
-
-void setup()
-{
-  while (!Serial);
-  Serial.begin(9600);
-  Serial.println("Getting Driver's fingerprint");
-
-  // set the data rate for the sensor serial port
-  finger.begin(57600);
-
-  if (finger.verifyPassword()) {
-    Serial.println("Found fingerprint sensor!");
-  } else {
-    Serial.println("Did not find fingerprint sensor :(");
-    while (1);
-  }
-
-
+  sprintf(tmp, format, num);
+  Serial.print(tmp);
 }
 
 uint8_t downloadFingerprintTemplate(uint16_t id)
@@ -73,7 +54,7 @@ uint8_t downloadFingerprintTemplate(uint16_t id)
   Serial.print(i); Serial.println(" bytes read.");
   Serial.println("Decoding packet...");
 
-  uint8_t fingerTemplate[512]; // the real template
+
   //memstet set all the locations to the same value..... memset(void *str, int c, size_t n)
   memset(fingerTemplate, 0xff, 512);
 
@@ -94,19 +75,6 @@ uint8_t downloadFingerprintTemplate(uint16_t id)
   }
   Serial.println("\ndone.");
 
-  return fingerTemplate;
+  return true;
 
 }
-
-
-
-void printHex(int num, int precision) {
-  char tmp[16];
-  char format[128];
-
-  sprintf(format, "%%.%dX", precision);
-
-  sprintf(tmp, format, num);
-  Serial.print(tmp);
-}
-
