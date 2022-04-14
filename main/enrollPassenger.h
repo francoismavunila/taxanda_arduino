@@ -143,7 +143,7 @@ uint8_t passengerEnroll() {
 }
 
 
-bool enrollPassenger(){
+uint8_t enrollPassenger(){
   Serial.println("Ready to enroll a fingerprint!");
   Serial.println("Please type in the ID # (from 1 to 127) you want to save this finger as...");
   _id = 2;

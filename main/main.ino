@@ -6,7 +6,8 @@
 #include <WiFiClientSecure.h>
 #include <HardwareSerial.h>
 
-uint8_t fingerTemplate[512]; // the real template
+uint8_t fingerTemplate[512]; 
+uint8_t passfingerTemplate[512]; 
 
 
 
@@ -14,6 +15,8 @@ uint8_t fingerTemplate[512]; // the real template
 #include "authenticate.h"
 #include "registerDriverPrint.h"
 #include "getDriverFingerPrint.h"
+#include "getPassengerFingerPrint.h"
+
 
 
 
@@ -38,6 +41,8 @@ const char* device_id = "1010";
 const char* driversub_topic= "driver/register/1010/getFP";
 
 const char* driverpub_topic="driv/register/sendFP";
+
+const char* activity_publish_topic="activity/1010/send";
 
 
 
@@ -165,7 +170,7 @@ void setup() {
   pinMode(doors, OUTPUT);
   digitalWrite(doors, LOW);
 }
-
+#include "sendActivity.h"
 void loop() {
   if (!client.connected()) reconnect();
   client.loop();
@@ -188,8 +193,20 @@ void loop() {
       Serial.print("dont open doors, allert police, driver not authenticated");
     }else{
       //get passenger id open doors and use the id to fetch and send the activity details to the server
-      Serial.print("get passenger id open doors and use the id to fetch and send the activity details to the server");
+      Serial.print("get passenger id open doors and use the id to fetch and send the activity details to the server, id is");
+      Serial.print(passId);
       digitalWrite(doors, HIGH);
+      //get passengers fingerprintId
+         if( downloadPassengerFinger(passId)){
+          Serial.print("we are now sending the activity values");
+              if(sendActivity()){
+                Serial.print("values sent");
+              }else{
+                Serial.print("values not sent , try saving them localy for sending later");
+              }
+         }else{
+          Serial.print("failed to get the value of the passeger's fingerprint");
+         }
     }
     auth = false;
   }
@@ -233,9 +250,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
              client.loop();
              bool st = client.publish(driverpub_topic,JSONmessageBuffer);
              Serial.print(st);
-     
-           
-                
 
 
        }else{
